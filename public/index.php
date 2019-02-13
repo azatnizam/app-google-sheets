@@ -4,10 +4,18 @@ $config = include(__DIR__ . "/../env/env.php");
 
 putenv('GOOGLE_APPLICATION_CREDENTIALS=' . __DIR__ . '/../env/' . $config["CREDENTIALS_JSON"]);
 
+// Local environment
+$config = [
+    "spreadsheet_id" => "1DTdFIKfifM2pNiEZZ9dlemRNTBLumNm9KXXRZRTV9vY",
+    "sheet_name" => "Выполнено (копия)",
+    "update_range" => "A2", // Google api will update range from A2 to data length
+];
+
 // Put here your new rows
 $updValues = [
-    ["1", "1", "1", "1", "1", "1", "1"],
-    ["2", "2", "2", "2", "2", "2", "2"]
+    ["тест", "тест", "лорем", "1", "1", "1", "1"],
+    ["тест", "тест", "лорем", "1", "1", "1", "1"],
+    ["ага", "2", "2", "2", "2", "2", "2"]
 ];
 
 $client = new Google_Client();
@@ -16,27 +24,30 @@ $client->addScope("https://www.googleapis.com/auth/spreadsheets");
 
 $sheetsService = new Google_Service_Sheets($client);
 $rangeBody = new Google_Service_Sheets_ValueRange( ["values" => $updValues] );
+$clearRequestBody = new Google_Service_Sheets_ClearValuesRequest();
+
 
 echo "<h3>Update Google Sheets via API</h3>";
 
 try {
- 
-    // Calculating count of existing rows
-    $response = $sheetsService->spreadsheets_values->get("1DTdFIKfifM2pNiEZZ9dlemRNTBLumNm9KXXRZRTV9vY", "Выполнено (копия)");
-    $tableCurRowsCount = count($response["values"]);
+    /* Variant #1: Total updating sheet */
+    
+    // Documentation: https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets.values/clear
+    $clearResponse = $sheetsService->spreadsheets_values->clear($config["spreadsheet_id"], $config["sheet_name"] . "!" . "A2:G", $clearRequestBody);
 
-    // Compose inserting range
-    $updRowsCount = count($updValues);
-    $updRange = ($tableCurRowsCount + 1) . ":" . ($tableCurRowsCount + 1 + $updRowsCount);
+    // Documentation: https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets.values/update
+    $updResponse = $sheetsService->spreadsheets_values->update($config["spreadsheet_id"], $config["sheet_name"] . "!" . $config["update_range"], $rangeBody, ['valueInputOption' => 'RAW']);
 
-    // Debug: tracing updatable range
-    // echo "2:" . $tableCurRowsCount . " - " .  ($tableCurRowsCount + 1) . ":" . ($tableCurRowsCount + $updRowsCount) . "<br />";
+    dump($clearResponse);
 
-    $updResponse = $sheetsService->spreadsheets_values->update("1DTdFIKfifM2pNiEZZ9dlemRNTBLumNm9KXXRZRTV9vY", "Выполнено (копия)!" . $updRange, $rangeBody, ['valueInputOption' => 'RAW']);
 
-    echo "<pre>";
-    print_r($updResponse);
-    echo "</pre>";
+    /* Variant #2: Append data into end of sheet */
+    /*
+    // Documentation: https://developers.google.com/sheets/api/reference/rest/v4/spreadsheets.values/append
+    $updResponse = $sheetsService->spreadsheets_values->append($config["spreadsheet_id"], $config["sheet_name"] . "!" . $config["update_range"], $rangeBody, ['valueInputOption' => 'RAW']);
+    */
+
+    dump($updResponse);
  
 } catch (Google_Service_Exception $exception) {
  
@@ -50,9 +61,4 @@ try {
     echo "<b>[ Error ]</b> " . $exception->getErrors()[0]["message"] . "<br />";
     echo $exception->getTrace()[$traceFilesCount-1]["file"] . " (line: " . $exception->getTrace()[$traceFilesCount-1]["line"] . ")";
     echo "</div>";
-
-    // Debug: show all Exeption fields
-    // echo "<pre style='background: #ff6969'>";
-    // print_r($exception);
-    // echo "</pre>";
 }
